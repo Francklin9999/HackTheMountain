@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from app.config import ENABLE_DEMO_CACHE, LOW_SCORE_THRESHOLD, OPENAI_MODEL_ID, STATIC_AUDIO_DIR
 from app.schemas.api import Artist, Connection, MatchBreakdown, MatchResponse, Track
@@ -14,8 +15,6 @@ from app.services.explain import _get_client
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-_ASSISTED_MATCH_MAX_ON_DEMAND_TRACKS = 24
 
 _FALLBACK_ARTIST_ID = "joseph-allard"
 
@@ -244,115 +243,117 @@ def _random_artist_response(input_feats: dict) -> MatchResponse:
     )
 
 
+def _match_audio_sync(tmp_path: Path) -> MatchResponse:
+    if ENABLE_DEMO_CACHE:
+        fp = cache.fingerprint(str(tmp_path))
+        if fp:
+            cached = cache.lookup(fp)
+            if cached:
+                logger.info("Demo cache hit for %s.", fp[:12])
+                return MatchResponse(**cached)
+
+    vec = embed.embed(str(tmp_path))
+    input_feats = features.extract(str(tmp_path))
+
+    if vec is None:
+        logger.warning("Embed returned None — picking random artist from DB.")
+        return _random_artist_response(input_feats)
+
+    results = search.search(vec, top_k=3)
+    if not results or results[0]["score"] < LOW_SCORE_THRESHOLD:
+        logger.warning("Low/no FAISS score — picking random artist from DB.")
+        return _random_artist_response(input_feats)
+
+    best = None
+    for r in results:
+        doc = artist_db.get_artist(r["artist_id"])
+        if not doc:
+            continue
+        track_doc = next((t for t in doc.get("tracks", []) if t["id"] == r["track_id"]), None)
+        if not track_doc and doc.get("tracks"):
+            track_doc = doc["tracks"][0]
+        if not track_doc:
+            continue
+
+        track_path = _track_audio_path(track_doc)
+        track_feats = features.get_track_features(track_doc.get("id", ""), track_path)
+
+        scored = features.weighted_match_score(r["score"], input_feats, track_feats)
+
+        candidate = {
+            "doc": doc,
+            "track_doc": track_doc,
+            "track_feats": track_feats,
+            "raw_cosine": r["score"],
+            "raw_overall": scored["raw_score"],
+            "overall": scored["score"],
+            "breakdown": scored["breakdown"],
+        }
+        if best is None or candidate["raw_overall"] > best["raw_overall"]:
+            best = candidate
+
+    if best is None:
+        return _random_artist_response(input_feats)
+
+    doc = best["doc"]
+    track_doc = best["track_doc"]
+    track_feats = best["track_feats"]
+    shared = features.shared_features(input_feats, track_feats)
+
+    explanation = explain.generate(
+        input_feats=input_feats,
+        artist_name=doc["name"],
+        artist_born=doc["born"],
+        artist_died=doc["died"],
+        track_title=track_doc["title"],
+        track_year=track_doc["year"],
+        track_feats=track_feats,
+        era_context=doc.get("era", ""),
+    )
+
+    artist_id = doc.get("id") or _FALLBACK_ARTIST_ID
+    src_url, src_lbl = _source_for(artist_id, doc)
+
+    return MatchResponse(
+        artist=Artist(
+            id=artist_id,
+            name=doc["name"],
+            born=doc["born"],
+            died=doc["died"],
+            region=doc["region"],
+            bio=doc["bio"],
+            photo_url=doc["photo_url"],
+            era=doc["era"],
+            source_url=src_url,
+            source_label=src_lbl,
+        ),
+        track=Track(
+            id=track_doc["id"],
+            title=track_doc["title"],
+            year=track_doc["year"],
+            audio_url=track_doc["audio_url"],
+            duration_s=track_doc["duration_s"],
+        ),
+        connection=Connection(
+            score=best["overall"],
+            explanation=explanation,
+            shared_features=shared,
+            breakdown=MatchBreakdown(**best["breakdown"]),
+            key_label=track_feats.get("key") if track_feats.get("key") != "unknown" else None,
+            tempo_bpm=track_feats.get("bpm") or None,
+            contour_label=track_feats.get("contour") if track_feats.get("contour") != "unknown" else None,
+            mode_label=_mode_label(track_feats),
+        ),
+    )
+
+
 @router.post("/match", response_model=MatchResponse)
 async def match_audio(audio: UploadFile):
     tmp_path = Path(f"/tmp/{uuid.uuid4()}.wav")
     try:
         content = await audio.read()
         tmp_path.write_bytes(content)
-
-        if ENABLE_DEMO_CACHE:
-            fp = cache.fingerprint(str(tmp_path))
-            if fp:
-                cached = cache.lookup(fp)
-                if cached:
-                    logger.info("Demo cache hit for %s.", fp[:12])
-                    return MatchResponse(**cached)
-
-        vec = embed.embed(str(tmp_path))
-        input_feats = features.extract(str(tmp_path))
-
-        if vec is None:
-            logger.warning("Embed returned None — picking random artist from DB.")
-            return _random_artist_response(input_feats)
-
-        results = search.search(vec, top_k=3)
-        if not results or results[0]["score"] < LOW_SCORE_THRESHOLD:
-            logger.warning("Low/no FAISS score — picking random artist from DB.")
-            return _random_artist_response(input_feats)
-
-        best = None
-        for r in results:
-            doc = artist_db.get_artist(r["artist_id"])
-            if not doc:
-                continue
-            track_doc = next((t for t in doc.get("tracks", []) if t["id"] == r["track_id"]), None)
-            if not track_doc and doc.get("tracks"):
-                track_doc = doc["tracks"][0]
-            if not track_doc:
-                continue
-
-            track_path = _track_audio_path(track_doc)
-            track_feats = features.get_track_features(track_doc.get("id", ""), track_path)
-
-            scored = features.weighted_match_score(r["score"], input_feats, track_feats)
-
-            candidate = {
-                "doc": doc,
-                "track_doc": track_doc,
-                "track_feats": track_feats,
-                "raw_cosine": r["score"],
-                "raw_overall": scored["raw_score"],
-                "overall": scored["score"],
-                "breakdown": scored["breakdown"],
-            }
-            if best is None or candidate["raw_overall"] > best["raw_overall"]:
-                best = candidate
-
-        if best is None:
-            return _random_artist_response(input_feats)
-
-        doc = best["doc"]
-        track_doc = best["track_doc"]
-        track_feats = best["track_feats"]
-        shared = features.shared_features(input_feats, track_feats)
-
-        explanation = explain.generate(
-            input_feats=input_feats,
-            artist_name=doc["name"],
-            artist_born=doc["born"],
-            artist_died=doc["died"],
-            track_title=track_doc["title"],
-            track_year=track_doc["year"],
-            track_feats=track_feats,
-            era_context=doc.get("era", ""),
-        )
-
-        artist_id = doc.get("id") or _FALLBACK_ARTIST_ID
-        src_url, src_lbl = _source_for(artist_id, doc)
-
-        return MatchResponse(
-            artist=Artist(
-                id=artist_id,
-                name=doc["name"],
-                born=doc["born"],
-                died=doc["died"],
-                region=doc["region"],
-                bio=doc["bio"],
-                photo_url=doc["photo_url"],
-                era=doc["era"],
-                source_url=src_url,
-                source_label=src_lbl,
-            ),
-            track=Track(
-                id=track_doc["id"],
-                title=track_doc["title"],
-                year=track_doc["year"],
-                audio_url=track_doc["audio_url"],
-                duration_s=track_doc["duration_s"],
-            ),
-            connection=Connection(
-                score=best["overall"],
-                explanation=explanation,
-                shared_features=shared,
-                breakdown=MatchBreakdown(**best["breakdown"]),
-                key_label=track_feats.get("key") if track_feats.get("key") != "unknown" else None,
-                tempo_bpm=track_feats.get("bpm") or None,
-                contour_label=track_feats.get("contour") if track_feats.get("contour") != "unknown" else None,
-                mode_label=_mode_label(track_feats),
-            ),
-        )
-
+        return await run_in_threadpool(_match_audio_sync, tmp_path)
     except Exception as exc:
         logger.error("/api/match unhandled error: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Match pipeline failed.")
@@ -417,7 +418,6 @@ def _explain_from_text(
 
 def _assisted_candidates(text_feats: dict) -> list[dict]:
     candidates = []
-    computed_on_demand = 0
 
     for aid, doc in artist_db.get_all().items():
         for track_doc in doc.get("tracks", []):
@@ -427,11 +427,7 @@ def _assisted_candidates(text_feats: dict) -> list[dict]:
 
             track_feats = features.get_cached_track_features(track_id)
             if track_feats is None:
-                if computed_on_demand >= _ASSISTED_MATCH_MAX_ON_DEMAND_TRACKS:
-                    continue
-                track_path = _track_audio_path(track_doc)
-                track_feats = features.get_track_features(track_id, track_path)
-                computed_on_demand += 1
+                continue
 
             scored = features.weighted_match_score(None, text_feats, track_feats)
             candidates.append({
@@ -443,16 +439,14 @@ def _assisted_candidates(text_feats: dict) -> list[dict]:
             })
 
     logger.info(
-        "Assisted match scanned %d tracks with %d on-demand feature extracts; cache_size=%d.",
+        "Assisted match scanned %d cached tracks; cache_size=%d.",
         len(candidates),
-        computed_on_demand,
         features.track_cache_size(),
     )
     return candidates
 
 
-@router.post("/match/assisted", response_model=MatchResponse)
-async def match_assisted(body: AssistedMatchRequest):
+def _match_assisted_sync(body: AssistedMatchRequest) -> MatchResponse:
     try:
         text_feats = explain.extract_musical_features(body.mode, body.value)
         if not text_feats:
@@ -462,7 +456,8 @@ async def match_assisted(body: AssistedMatchRequest):
 
         if not candidates:
             logger.warning(
-                "Assisted match fell back with an empty candidate pool; cache_size=%d.",
+                "Assisted match: no cached track features yet (cache_size=%d) — "
+                "returning fallback. Run pipeline.embed_corpus or wait for warmup to finish.",
                 features.track_cache_size(),
             )
             return _FALLBACK_RESPONSE
@@ -529,3 +524,8 @@ async def match_assisted(body: AssistedMatchRequest):
     except Exception as exc:
         logger.error("/api/match/assisted unhandled error: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Assisted match failed.")
+
+
+@router.post("/match/assisted", response_model=MatchResponse)
+async def match_assisted(body: AssistedMatchRequest):
+    return await run_in_threadpool(_match_assisted_sync, body)
