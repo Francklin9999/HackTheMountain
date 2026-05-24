@@ -13,6 +13,10 @@ export async function postMatch(audioBlob: Blob): Promise<MatchResponse> {
 type AssistedInputMode = 'description' | 'link'
 
 export async function createAssistedMatch(mode: AssistedInputMode, value: string): Promise<MatchResponse> {
-  const { data } = await client.post<MatchResponse>('/api/match/assisted', { mode, value })
+  const { data } = await client.post<MatchResponse>(
+    '/api/match/assisted',
+    { mode, value },
+    { timeout: 90000 },
+  )
   return data
 }

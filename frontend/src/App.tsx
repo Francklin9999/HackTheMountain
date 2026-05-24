@@ -1,7 +1,6 @@
-import { useEffect, lazy, Suspense } from 'react'
+import { lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAppStore } from './state/appStore'
-import { getHealth } from './api/health'
 import StartScreen from './screens/StartScreen'
 import HumScreen from './screens/HumScreen'
 import SearchingScreen from './screens/SearchingScreen'
@@ -25,13 +24,7 @@ const PRIMARY_ROUTES: Array<{
 ]
 
 export default function App() {
-  const { appState, backendAlive, currentMatch, currentArtist, setBackendAlive, setAppState } = useAppStore()
-
-  useEffect(() => {
-    getHealth()
-      .then(() => setBackendAlive(true))
-      .catch(() => setBackendAlive(false))
-  }, [setBackendAlive])
+  const { appState, currentMatch, currentArtist, setAppState } = useAppStore()
 
   const activeRoute = normalizeRoute(appState)
   const currentRouteLabel = PRIMARY_ROUTES.find((route) => route.id === activeRoute)?.label ?? 'Home'
@@ -119,8 +112,6 @@ export default function App() {
           </nav>
 
           <div className="header-status">
-            {backendAlive === false && <span className="header-pill header-pill--danger">backend offline</span>}
-            {backendAlive === true && <span className="header-pill">● archive online</span>}
             {currentMatch && (
               <span className="header-pill header-pill--soft">
                 current match · {currentMatch.artist.name}

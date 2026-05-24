@@ -17,14 +17,12 @@ interface AppStore {
   currentArtist: ArtistResponse | null
   audioPlaying: boolean
   micVolume: number
-  backendAlive: boolean | null
   history: DiscoveryEntry[]
   setAppState: (s: AppState) => void
   setMatch: (m: MatchResponse) => void
   setCurrentArtist: (a: ArtistResponse) => void
   setAudioPlaying: (v: boolean) => void
   setMicVolume: (v: number) => void
-  setBackendAlive: (v: boolean) => void
   pushDiscovery: (e: DiscoveryEntry) => void
   reset: () => void
 }
@@ -35,7 +33,6 @@ export const useAppStore = create<AppStore>((set) => ({
   currentArtist: null,
   audioPlaying: false,
   micVolume: 0,
-  backendAlive: null,
   history: [],
 
   setAppState: (s) => set({ appState: s }),
@@ -43,7 +40,6 @@ export const useAppStore = create<AppStore>((set) => ({
   setCurrentArtist: (a) => set({ currentArtist: a }),
   setAudioPlaying: (v) => set({ audioPlaying: v }),
   setMicVolume: (v) => set({ micVolume: v }),
-  setBackendAlive: (v) => set({ backendAlive: v }),
   pushDiscovery: (e) => set((state) => {
     const without = state.history.filter((h) => h.id !== e.id)
     return { history: [e, ...without].slice(0, 8) }

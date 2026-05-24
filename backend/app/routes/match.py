@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+_ASSISTED_MATCH_MAX_ON_DEMAND_TRACKS = 24
+
 _FALLBACK_ARTIST_ID = "joseph-allard"
 
 _FALLBACK_RESPONSE = MatchResponse(
@@ -413,6 +415,42 @@ def _explain_from_text(
         )
 
 
+def _assisted_candidates(text_feats: dict) -> list[dict]:
+    candidates = []
+    computed_on_demand = 0
+
+    for aid, doc in artist_db.get_all().items():
+        for track_doc in doc.get("tracks", []):
+            track_id = track_doc.get("id", "")
+            if not track_id:
+                continue
+
+            track_feats = features.get_cached_track_features(track_id)
+            if track_feats is None:
+                if computed_on_demand >= _ASSISTED_MATCH_MAX_ON_DEMAND_TRACKS:
+                    continue
+                track_path = _track_audio_path(track_doc)
+                track_feats = features.get_track_features(track_id, track_path)
+                computed_on_demand += 1
+
+            scored = features.weighted_match_score(None, text_feats, track_feats)
+            candidates.append({
+                "artist_id": aid,
+                "doc": doc,
+                "track_doc": track_doc,
+                "track_feats": track_feats,
+                "scored": scored,
+            })
+
+    logger.info(
+        "Assisted match scanned %d tracks with %d on-demand feature extracts; cache_size=%d.",
+        len(candidates),
+        computed_on_demand,
+        features.track_cache_size(),
+    )
+    return candidates
+
+
 @router.post("/match/assisted", response_model=MatchResponse)
 async def match_assisted(body: AssistedMatchRequest):
     try:
@@ -420,27 +458,20 @@ async def match_assisted(body: AssistedMatchRequest):
         if not text_feats:
             text_feats = {"key": "unknown", "key_root": -1, "mode": "unknown", "bpm": 0.0, "contour": "unknown"}
 
-        candidates = []
-        for aid, doc in artist_db.get_all().items():
-            for track_doc in doc.get("tracks", []):
-                track_path = _track_audio_path(track_doc)
-                track_feats = features.get_track_features(track_doc.get("id", ""), track_path)
-                scored = features.weighted_match_score(None, text_feats, track_feats)
-                candidates.append({
-                    "artist_id": aid,
-                    "doc": doc,
-                    "track_doc": track_doc,
-                    "track_feats": track_feats,
-                    "scored": scored,
-                })
+        candidates = _assisted_candidates(text_feats)
 
         if not candidates:
+            logger.warning(
+                "Assisted match fell back with an empty candidate pool; cache_size=%d.",
+                features.track_cache_size(),
+            )
             return _FALLBACK_RESPONSE
 
         candidates.sort(key=lambda c: c["scored"]["score"], reverse=True)
         pool = candidates[:min(5, len(candidates))]
         weights = [c["scored"]["score"] for c in pool]
         best = random.choices(pool, weights=weights, k=1)[0]
+        logger.info("Assisted match selected a pool of %d candidates.", len(pool))
 
         artist_id = best["artist_id"]
         doc = best["doc"]
@@ -460,8 +491,9 @@ async def match_assisted(body: AssistedMatchRequest):
             era_context=doc.get("era", ""),
             track_feats=track_feats,
         )
+        logger.info("Assisted match explanation generated for %s / %s.", artist_id, track_doc["id"])
 
-        return MatchResponse(
+        response = MatchResponse(
             artist=Artist(
                 id=artist_id,
                 name=doc["name"],
@@ -492,6 +524,8 @@ async def match_assisted(body: AssistedMatchRequest):
                 mode_label=_mode_label(track_feats),
             ),
         )
+        logger.info("Assisted match response ready for %s.", artist_id)
+        return response
     except Exception as exc:
         logger.error("/api/match/assisted unhandled error: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Assisted match failed.")

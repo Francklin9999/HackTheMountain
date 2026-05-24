@@ -1,10 +1,8 @@
 import logging
-import threading
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import CORS_ORIGINS, STATIC_AUDIO_DIR
+from app.config import CORS_ORIGINS, ENABLE_TRACK_WARMUP, STATIC_AUDIO_DIR
 from app.routes import artists, audio, graph, health, match, photos
 from app.services import artist_db, embed, features, search
 
@@ -45,11 +43,19 @@ async def startup():
     logger.info("Loading track feature cache …")
     features.load_track_feature_cache()
 
-    logger.info(
-        "Startup complete. corpus_size=%d — warming track features in background …",
-        search.corpus_size(),
-    )
-    threading.Thread(target=_background_warmup, daemon=True).start()
+    if ENABLE_TRACK_WARMUP:
+        logger.info(
+            "Startup complete. corpus_size=%d — warming track features in background …",
+            search.corpus_size(),
+        )
+        import threading
+
+        threading.Thread(target=_background_warmup, daemon=True).start()
+    else:
+        logger.info(
+            "Startup complete. corpus_size=%d — deferred track warmup is disabled.",
+            search.corpus_size(),
+        )
 
 
 app.include_router(health.router, prefix="/api")

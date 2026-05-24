@@ -9,9 +9,9 @@
   --surface-2: oklch(0.13 0.008 60);
   --border: oklch(0.22 0.010 60 / 0.6);
   --border-strong: oklch(0.30 0.010 60 / 0.8);
-  --text: oklch(0.90 0.014 80);
-  --text-muted: oklch(0.58 0.012 70);
-  --text-dim: oklch(0.56 0.008 70);
+  --text: oklch(0.93 0.014 80);
+  --text-muted: oklch(0.72 0.012 70);
+  --text-dim: oklch(0.66 0.008 70);
 
   /* ── Amber accent (muted, aged gold) ── */
   --accent: oklch(0.72 0.12 72);
@@ -64,7 +64,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
@@ -162,7 +162,7 @@ body {
   border-radius: 0;
   padding: 8px 14px;
   background: transparent;
-  color: oklch(0.62 0.012 70);
+  color: oklch(0.76 0.012 70);
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.10em;
@@ -253,7 +253,7 @@ body {
   background: transparent;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: oklch(0.62 0.012 70);
+  color: oklch(0.76 0.012 70);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -328,7 +328,7 @@ body {
 }
 
 .header-drawer__copy {
-  color: rgba(197, 204, 219, 0.6);
+  color: rgba(197, 204, 219, 0.84);
   font-size: 0.95rem;
   line-height: 1.6;
 }
@@ -510,7 +510,7 @@ body {
   font-family: var(--font-serif);
   font-size: clamp(2rem, 2.7vw, 3.1rem);
   line-height: 1;
-  color: rgba(232, 224, 204, 0.78);
+  color: rgba(232, 224, 204, 0.92);
 }
 
 .archive-start__body {
@@ -518,7 +518,7 @@ body {
   font-family: var(--font-body);
   font-size: 1.08rem;
   line-height: 1.75;
-  color: rgba(210, 203, 191, 0.45);
+  color: rgba(210, 203, 191, 0.78);
 }
 
 .archive-start__actions {
@@ -719,7 +719,7 @@ body {
 .archive-start__caption-track {
   font-size: 11px;
   letter-spacing: 0.18em;
-  color: rgba(171, 166, 157, 0.48);
+  color: rgba(171, 166, 157, 0.78);
 }
 
 .archive-start__caption-footer {
@@ -1041,7 +1041,7 @@ body {
   font-family: var(--font-body);
   font-size: 0.9rem;
   line-height: 1.6;
-  color: rgba(192, 200, 220, 0.56);
+  color: rgba(192, 200, 220, 0.80);
   font-weight: 300;
 }
 
@@ -1123,7 +1123,7 @@ body {
 }
 
 .hum-screen__status {
-  color: rgba(214, 162, 67, 0.62);
+  color: rgba(214, 162, 67, 0.86);
 }
 
 /* ── Mobile: single column ── */
@@ -1259,7 +1259,7 @@ body {
   font-family: var(--font-body);
   font-size: 13px;
   font-weight: 300;
-  color: oklch(0.74 0.012 80);
+  color: oklch(0.86 0.012 80);
   letter-spacing: 0.01em;
 }
 
@@ -1376,7 +1376,7 @@ body {
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(243, 239, 233, 0.52);
+  color: rgba(243, 239, 233, 0.76);
 }
 
 .graph-screen__title {
@@ -1397,7 +1397,7 @@ body {
   line-height: 1.8;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(245, 240, 232, 0.56);
+  color: rgba(245, 240, 232, 0.80);
   text-wrap: pretty;
 }
 
@@ -1835,7 +1835,7 @@ body {
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(243, 239, 233, 0.46);
+  color: rgba(243, 239, 233, 0.72);
 }
 
 .graph-screen__section-plate-title {
@@ -1856,7 +1856,7 @@ body {
   line-height: 1.7;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(245, 240, 232, 0.5);
+  color: rgba(245, 240, 232, 0.76);
   text-wrap: pretty;
 }
 
@@ -2049,7 +2049,7 @@ body {
   font-size: 10px;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  fill: rgba(247, 242, 234, 0.62);
+  fill: rgba(247, 242, 234, 0.84);
 }
 
 .graph-screen__sublabel {
@@ -2057,7 +2057,7 @@ body {
   font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  fill: rgba(247, 242, 234, 0.34);
+  fill: rgba(247, 242, 234, 0.60);
 }
 
 .graph-screen__context-panel {
@@ -2083,7 +2083,7 @@ body {
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(243, 239, 233, 0.46);
+  color: rgba(243, 239, 233, 0.72);
 }
 
 .graph-screen__context-title {
@@ -2103,7 +2103,7 @@ body {
   line-height: 1.75;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(245, 240, 232, 0.5);
+  color: rgba(245, 240, 232, 0.76);
   text-wrap: pretty;
 }
 
@@ -2117,7 +2117,7 @@ body {
 .graph-screen__context-meta span {
   padding: 6px 0;
   border-radius: 999px;
-  color: rgba(245, 240, 232, 0.38);
+  color: rgba(245, 240, 232, 0.68);
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.2em;
@@ -2137,7 +2137,7 @@ body {
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(245, 240, 232, 0.42);
+  color: rgba(245, 240, 232, 0.68);
 }
 
 .graph-screen__overlay {
@@ -2201,7 +2201,7 @@ body {
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(245, 240, 232, 0.44);
+  color: rgba(245, 240, 232, 0.70);
 }
 
 .graph-screen__detail-title {
@@ -2218,7 +2218,7 @@ body {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.18em;
-  color: rgba(245, 240, 232, 0.4);
+  color: rgba(245, 240, 232, 0.70);
   text-transform: uppercase;
 }
 
@@ -2228,7 +2228,7 @@ body {
   line-height: 1.8;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(245, 240, 232, 0.52);
+  color: rgba(245, 240, 232, 0.78);
   text-wrap: pretty;
 }
 
@@ -2832,7 +2832,7 @@ textarea {
   margin-top: 10px;
   font-size: 0.68rem;
   letter-spacing: 0.08em;
-  color: rgba(205, 193, 173, 0.64);
+  color: rgba(205, 193, 173, 0.86);
 }
 
 .artist-card__surface,
@@ -2858,7 +2858,7 @@ textarea {
 }
 
 .artist-card__surface-title span {
-  color: rgba(195, 184, 165, 0.66);
+  color: rgba(195, 184, 165, 0.86);
   font-weight: 300;
 }
 
@@ -2991,7 +2991,7 @@ textarea {
 }
 
 .artist-card__bio {
-  color: rgba(208, 199, 184, 0.72);
+  color: rgba(208, 199, 184, 0.92);
   line-height: 1.72;
 }
 
@@ -3077,7 +3077,7 @@ textarea {
   font-size: 0.64rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(198, 204, 218, 0.62);
+  color: rgba(198, 204, 218, 0.86);
 }
 
 .mic-button__label.is-listening {
@@ -3178,7 +3178,7 @@ textarea {
   border-radius: 999px;
   border: 1px solid rgba(214, 190, 146, 0.16);
   background: rgba(255, 248, 236, 0.04);
-  color: rgba(223, 212, 194, 0.74);
+  color: rgba(223, 212, 194, 0.92);
   text-decoration: none;
   cursor: pointer;
   font-family: var(--font-mono);
@@ -3214,7 +3214,7 @@ textarea {
   font-size: 0.58rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(204, 183, 148, 0.72);
+  color: rgba(204, 183, 148, 0.90);
 }
 
 .explore-layout--screen {
@@ -3245,7 +3245,7 @@ textarea {
 
 .explore-screen__section-copy {
   max-width: 34rem;
-  color: rgba(206, 198, 186, 0.68);
+  color: rgba(206, 198, 186, 0.90);
   line-height: 1.65;
   text-wrap: pretty;
 }
@@ -3289,7 +3289,7 @@ textarea {
   margin-top: 4px;
   font-family: var(--font-mono);
   font-size: 0.62rem;
-  color: rgba(197, 185, 167, 0.58);
+  color: rgba(197, 185, 167, 0.82);
   letter-spacing: 0.08em;
 }
 
@@ -3490,7 +3490,7 @@ textarea {
   font-size: 0.54rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(206, 197, 178, 0.34);
+  color: rgba(206, 197, 178, 0.68);
 }
 
 .reveal-screen__tool-row {
@@ -3529,7 +3529,7 @@ textarea {
   font-size: 0.56rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(213, 203, 187, 0.48);
+  color: rgba(213, 203, 187, 0.78);
 }
 
 .reveal-screen__scorebar {
@@ -3568,7 +3568,7 @@ textarea {
   font-size: 0.58rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(215, 199, 171, 0.58);
+  color: rgba(215, 199, 171, 0.84);
 }
 
 .reveal-screen__artist-name {
@@ -3595,7 +3595,7 @@ textarea {
   font-size: 0.58rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(210, 202, 188, 0.66);
+  color: rgba(210, 202, 188, 0.88);
 }
 
 .reveal-screen__quote {
@@ -3603,7 +3603,7 @@ textarea {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-md);
-  color: rgba(231, 223, 209, 0.74);
+  color: rgba(231, 223, 209, 0.92);
   line-height: 1.75;
 }
 
@@ -3617,7 +3617,7 @@ textarea {
   padding: 5px 9px;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.12);
-  color: rgba(220, 210, 193, 0.64);
+  color: rgba(220, 210, 193, 0.88);
   font-family: var(--font-mono);
   font-size: 0.56rem;
   letter-spacing: 0.1em;
@@ -3630,7 +3630,7 @@ textarea {
 }
 
 .reveal-screen__bio {
-  color: rgba(216, 206, 189, 0.62);
+  color: rgba(216, 206, 189, 0.88);
   line-height: 1.75;
 }
 
@@ -3640,7 +3640,7 @@ textarea {
   gap: 6px;
   align-self: flex-start;
   text-decoration: none;
-  color: rgba(232, 217, 184, 0.72);
+  color: rgba(232, 217, 184, 0.92);
   font-size: 0.58rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -3670,7 +3670,7 @@ textarea {
   appearance: none;
   border: 0;
   background: none;
-  color: rgba(208, 199, 183, 0.46);
+  color: rgba(208, 199, 183, 0.74);
   cursor: pointer;
   font-size: 0.58rem;
   letter-spacing: 0.14em;
@@ -3749,7 +3749,7 @@ textarea {
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(0,0,0,0.45);
-  color: rgba(255,255,255,0.62);
+  color: rgba(255,255,255,0.86);
   font-size: 0.56rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -3767,7 +3767,7 @@ textarea {
   font-size: 0.58rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.48);
+  color: rgba(255,255,255,0.76);
 }
 
 .reveal-screen__headline-title {
@@ -3825,7 +3825,7 @@ textarea {
   margin-top: 3px;
   font-size: 0.56rem;
   letter-spacing: 0.08em;
-  color: rgba(255,255,255,0.38);
+  color: rgba(255,255,255,0.64);
 }
 
 .reveal-screen__player-waveform {
@@ -3856,7 +3856,7 @@ textarea {
   font-size: 0.5rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.60);
 }
 
 .graph-screen--compact {
@@ -4077,7 +4077,7 @@ textarea {
     justify-items: center;
     align-content: center;
     gap: 6px;
-    color: rgba(204, 194, 177, 0.56);
+    color: rgba(204, 194, 177, 0.80);
     cursor: pointer;
   }
 

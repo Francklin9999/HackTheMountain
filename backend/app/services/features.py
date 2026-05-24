@@ -56,6 +56,26 @@ def _save_cache_unlocked() -> None:
         logger.warning("Could not save track feature cache: %s", exc)
 
 
+def track_cache_size() -> int:
+    with _cache_lock:
+        return len(_track_cache)
+
+
+def get_cached_track_features(track_id: str) -> dict | None:
+    with _cache_lock:
+        feats = _track_cache.get(track_id)
+        return dict(feats) if feats else None
+
+
+def save_track_feature_cache() -> None:
+    with _cache_lock:
+        _save_cache_unlocked()
+
+
+def _should_persist_cache_entry(cache_size: int) -> bool:
+    return cache_size <= 10 or cache_size % 10 == 0
+
+
 
 def extract(wav_path: str) -> dict:
     if not _librosa_ok:
@@ -106,8 +126,7 @@ def get_track_features(track_id: str, audio_path: str | None) -> dict:
 
     with _cache_lock:
         _track_cache[track_id] = feats
-        # Periodically save — every 50 new entries to avoid thrashing
-        if len(_track_cache) % 50 == 0:
+        if _should_persist_cache_entry(len(_track_cache)):
             _save_cache_unlocked()
 
     return feats
@@ -154,6 +173,8 @@ def warm_all_tracks(corpus_meta: dict, get_artist_fn, static_audio_dir) -> None:
         feats = extract(str(path))
         with _cache_lock:
             _track_cache[track_id] = feats
+            if _should_persist_cache_entry(len(_track_cache)):
+                _save_cache_unlocked()
         computed += 1
 
     with _cache_lock:
