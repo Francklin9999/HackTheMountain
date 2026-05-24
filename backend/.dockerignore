@@ -13,3 +13,14 @@ scripts/
 .git
 .gitignore
 *.md
+!data/
+data/*
+!data/corpus.faiss
+!data/corpus_meta.json
+!data/artists_backup.json
+!static/
+static/*
+!static/audio/
+!static/audio/**
+!static/photos/
+!static/photos/**
