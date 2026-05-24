@@ -85,3 +85,16 @@ cd backend
 docker build -t sillon-backend .
 docker run --env-file .env -p 8000:8000 sillon-backend
 ```
+
+The backend image now precomputes as much as possible during `docker build` by default:
+
+- loads the MERT model
+- loads the FAISS index and artist cache
+- warms the per-track feature cache used during matching
+
+For the compose setup, this is controlled by:
+
+- `PRECOMPUTE_ON_BUILD=1` to bake caches into the image during build
+- `BOOTSTRAP_ON_START=missing` to recompute at container start only if the runtime cache is absent
+
+If you want a faster image build and are okay with doing the work later at runtime, set `PRECOMPUTE_ON_BUILD=0`.

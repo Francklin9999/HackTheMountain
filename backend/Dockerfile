@@ -1,5 +1,7 @@
 FROM python:3.11-slim
 
+ARG PRECOMPUTE_ON_BUILD=1
+
 WORKDIR /app
 
 # Audio processing system deps
@@ -19,6 +21,18 @@ RUN grep -vE "^torch" requirements.txt \
 
 COPY . .
 
+# Stage bundled data and static files so the entrypoint can seed empty
+# bind-mount dirs on first run (docker-compose mounts override COPY'd files).
+RUN cp -a /app/data /app/_bundled_data \
+    && cp -a /app/static /app/_bundled_static
+
 RUN chmod 755 /app/entrypoint.sh
+
+RUN if [ "$PRECOMPUTE_ON_BUILD" = "1" ]; then python -m app.bootstrap; fi
+
+# Stage the precomputed cache so it can seed the named volume on first run
+RUN if [ -d /root/.cache/sillon ]; then \
+      cp -a /root/.cache/sillon /app/_bundled_cache; \
+    fi
 
 ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]
