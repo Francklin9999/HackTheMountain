@@ -70,6 +70,14 @@ python -m pipeline.seed_mongo      # (optional) push to MongoDB
 
 ---
 
+## Data sources
+
+- **Audio recordings** — [Internet Archive 78rpm collection](https://archive.org/details/78rpm) (public domain)
+- **Artist metadata** — [Wikidata](https://www.wikidata.org/) (SPARQL queries for Quebec folk musicians)
+- **Additional recordings & context** — [Virtual Gramophone](https://www.collectionscanada.gc.ca/gramophone/) by Library & Archives Canada
+
+---
+
 ## Docker
 
 ```bash
