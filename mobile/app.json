@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Sillon Mobile",
+    "slug": "sillon-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Sillon Mobile to access your microphone."
+        }
+      ]
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f1720"
+      }
+    }
+  }
+}

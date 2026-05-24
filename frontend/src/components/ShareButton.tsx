@@ -1,0 +1,37 @@
+import type { Artist } from '../types/api'
+import { shareArtist } from '../utils/share'
+import { hapticTap } from '../utils/haptic'
+
+interface Props { artist: Artist }
+
+export default function ShareButton({ artist }: Props) {
+  if (!navigator.share) return null
+
+  const handleShare = async () => {
+    hapticTap()
+    await shareArtist(artist)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleShare}
+      className="share-button"
+    >
+      <ShareIcon />
+      Share
+    </button>
+  )
+}
+
+function ShareIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  )
+}

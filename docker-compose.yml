@@ -1,0 +1,89 @@
+services:
+
+  # ── MongoDB ────────────────────────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: sillon
+      MONGO_INITDB_ROOT_PASSWORD: sillon
+      MONGO_INITDB_DATABASE: sillon
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # ── FastAPI backend ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/app/entrypoint.sh"]
+    # Exposed for the Expo mobile client, which talks to the API directly.
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      # MongoDB — points to the mongo service above (no config needed)
+      MONGODB_URI: mongodb://sillon:sillon@mongo:27017/sillon?authSource=admin
+
+      # Allowed CORS origins (comma-separated)
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://frontend
+    volumes:
+      # Audio files and FAISS index are kept on the host so they survive rebuilds
+      - ./backend/static:/app/static
+      - ./backend/data:/app/data
+      # HuggingFace model cache persists across container restarts
+      - hf_cache:/root/.cache/huggingface
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+    # ── GPU support (NVIDIA) ──────────────────────────────────────────────
+    # Uncomment the block below if you have an NVIDIA GPU and nvidia-docker
+    # installed. The API will use CUDA automatically when torch detects it.
+    #
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # ── React frontend (nginx) ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+  # ── Expo mobile frontend ───────────────────────────────────────────────────
+  mobile:
+    build:
+      context: ./mobile
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-}
+    volumes:
+      - ./mobile:/app
+      - mobile_node_modules:/app/node_modules
+    stdin_open: true
+    tty: true
+    depends_on:
+      - api
+
+volumes:
+  mongo_data:
+  hf_cache:
+  mobile_node_modules:
