@@ -11,15 +11,28 @@ _extractor = None
 _device = "cpu"
 
 
+def _resolve_device(preferred: str) -> str:
+    try:
+        import torch
+    except Exception:
+        return "cpu"
+
+    if preferred == "cpu":
+        return "cpu"
+    if preferred == "cuda":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 def load_model() -> None:
     global _model, _extractor, _device
     try:
         import torch
         from transformers import AutoModel, Wav2Vec2FeatureExtractor
 
-        from app.config import MERT_MODEL_ID
+        from app.config import MERT_DEVICE, MERT_MODEL_ID
 
-        _device = "cuda" if torch.cuda.is_available() else "cpu"
+        _device = _resolve_device(MERT_DEVICE)
         logger.info("Loading MERT model %s on %s …", MERT_MODEL_ID, _device)
         _model = AutoModel.from_pretrained(MERT_MODEL_ID, trust_remote_code=True)
         _extractor = Wav2Vec2FeatureExtractor.from_pretrained(MERT_MODEL_ID)
@@ -50,6 +63,10 @@ def embed(wav_path: str) -> np.ndarray | None:
             out = _model(**inputs, output_hidden_states=True)
 
         vec = out.hidden_states[7].mean(dim=1).squeeze(0).cpu().numpy()
+        del out
+        del inputs
+        if _device == "cuda":
+            torch.cuda.empty_cache()
         norm = np.linalg.norm(vec)
         if norm == 0:
             return None

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import CORS_ORIGINS, ENABLE_TRACK_WARMUP, STATIC_AUDIO_DIR
 from app.routes import artists, audio, graph, health, match, photos
-from app.services import artist_db, embed, features, search
+from app.services import artist_db, clap, embed, features, search
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,12 +21,16 @@ app.add_middleware(
 
 
 def _background_warmup() -> None:
-    """Pre-compute track features for all corpus entries in a background thread."""
     corpus_meta = search.get_corpus_meta()
     if not corpus_meta:
         logger.info("Feature warmup skipped: no corpus meta loaded.")
         return
     features.warm_all_tracks(corpus_meta, artist_db.get_artist, STATIC_AUDIO_DIR)
+
+    if clap.is_available() and not search.has_clap_index():
+        logger.info("Building CLAP index in background …")
+        from app.bootstrap import _build_clap_index
+        _build_clap_index()
 
 
 @app.on_event("startup")
@@ -42,6 +46,12 @@ async def startup():
 
     logger.info("Loading track feature cache …")
     features.load_track_feature_cache()
+
+    logger.info("Loading CLAP model …")
+    clap.load_model()
+
+    logger.info("Loading CLAP index …")
+    search.load_clap_index()
 
     if ENABLE_TRACK_WARMUP:
         logger.info(

@@ -19,6 +19,7 @@ data/*
 !data/corpus_meta.json
 !data/artists_backup.json
 !data/demo_cache.json
+!data/corpus_clap.faiss
 !static/
 static/*
 !static/audio/

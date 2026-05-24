@@ -16,7 +16,7 @@ export async function createAssistedMatch(mode: AssistedInputMode, value: string
   const { data } = await client.post<MatchResponse>(
     '/api/match/assisted',
     { mode, value },
-    { timeout: 90000 },
+    { timeout: 0 },
   )
   return data
 }

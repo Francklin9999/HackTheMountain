@@ -9,7 +9,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import ENABLE_DEMO_CACHE, LOW_SCORE_THRESHOLD, OPENAI_MODEL_ID, STATIC_AUDIO_DIR
 from app.schemas.api import Artist, Connection, MatchBreakdown, MatchResponse, Track
-from app.services import artist_db, cache, embed, explain, features, search
+from app.services import artist_db, cache, clap, embed, explain, features, search
 from app.services.explain import _get_client
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _FALLBACK_ARTIST_ID = "joseph-allard"
+
+
+def _synthetic_doc_from_meta(meta: dict) -> dict:
+    title = meta.get("title", "Unknown recording")
+    year = meta.get("year", 0)
+    audio_url = meta.get("audio_url", "")
+    track_id = meta.get("track_id", "unknown-track")
+    return {
+        "id": "unknown",
+        "name": "Unknown Artist",
+        "born": 0,
+        "died": 0,
+        "region": "Quebec",
+        "bio": "An unidentified artist from the 78rpm archive. The recording survives but the name behind it has been lost to time.",
+        "photo_url": "",
+        "era": "78rpm era",
+        "tracks": [{
+            "id": track_id,
+            "title": title,
+            "year": year,
+            "audio_url": audio_url,
+            "duration_s": 0,
+        }],
+        "related": [],
+    }
 
 _FALLBACK_RESPONSE = MatchResponse(
     artist=Artist(
@@ -259,28 +284,39 @@ def _match_audio_sync(tmp_path: Path) -> MatchResponse:
         logger.warning("Embed returned None — picking random artist from DB.")
         return _random_artist_response(input_feats)
 
-    results = search.search(vec, top_k=3)
+    results = search.search(vec, top_k=20)
     if not results or results[0]["score"] < LOW_SCORE_THRESHOLD:
         logger.warning("Low/no FAISS score — picking random artist from DB.")
         return _random_artist_response(input_feats)
 
-    best = None
+    candidates = []
+    seen_artists: set[str] = set()
     for r in results:
         doc = artist_db.get_artist(r["artist_id"])
         if not doc:
+            corpus_meta = search.get_corpus_meta()
+            meta = corpus_meta.get(str(r["row_index"]), {})
+            if not meta.get("audio_url"):
+                continue
+            doc = _synthetic_doc_from_meta(meta)
+        artist_key = r["artist_id"] + ":" + r["track_id"]
+        if artist_key in seen_artists:
             continue
+        seen_artists.add(artist_key)
+
         track_doc = next((t for t in doc.get("tracks", []) if t["id"] == r["track_id"]), None)
         if not track_doc and doc.get("tracks"):
             track_doc = doc["tracks"][0]
         if not track_doc:
             continue
 
-        track_path = _track_audio_path(track_doc)
-        track_feats = features.get_track_features(track_doc.get("id", ""), track_path)
+        track_feats = features.get_cached_track_features(track_doc.get("id", ""))
+        if track_feats is None:
+            track_feats = {"key": "unknown", "key_root": -1, "mode": "unknown", "bpm": 0.0, "contour": "unknown"}
 
         scored = features.weighted_match_score(r["score"], input_feats, track_feats)
 
-        candidate = {
+        candidates.append({
             "doc": doc,
             "track_doc": track_doc,
             "track_feats": track_feats,
@@ -288,12 +324,15 @@ def _match_audio_sync(tmp_path: Path) -> MatchResponse:
             "raw_overall": scored["raw_score"],
             "overall": scored["score"],
             "breakdown": scored["breakdown"],
-        }
-        if best is None or candidate["raw_overall"] > best["raw_overall"]:
-            best = candidate
+        })
 
-    if best is None:
+    if not candidates:
         return _random_artist_response(input_feats)
+
+    candidates.sort(key=lambda c: c["raw_overall"], reverse=True)
+    pool = candidates[:min(5, len(candidates))]
+    weights = [c["overall"] for c in pool]
+    best = random.choices(pool, weights=weights, k=1)[0]
 
     doc = best["doc"]
     track_doc = best["track_doc"]
@@ -446,8 +485,120 @@ def _assisted_candidates(text_feats: dict) -> list[dict]:
     return candidates
 
 
+def _clap_assisted_match(body: AssistedMatchRequest) -> MatchResponse | None:
+    if not clap.is_available() or not search.has_clap_index():
+        return None
+
+    query = body.value
+    if body.mode == "description":
+        query = f"music that sounds like: {body.value}"
+
+    vec = clap.embed_text(query)
+    if vec is None:
+        return None
+
+    results = search.search_clap(vec, top_k=20)
+    if not results:
+        return None
+
+    candidates = []
+    for r in results:
+        doc = artist_db.get_artist(r["artist_id"])
+        if not doc:
+            corpus_meta = search.get_corpus_meta()
+            meta = corpus_meta.get(str(r["row_index"]), {})
+            if not meta.get("audio_url"):
+                continue
+            doc = _synthetic_doc_from_meta(meta)
+        track_doc = next((t for t in doc.get("tracks", []) if t["id"] == r["track_id"]), None)
+        if not track_doc and doc.get("tracks"):
+            track_doc = doc["tracks"][0]
+        if not track_doc:
+            continue
+
+        track_feats = features.get_cached_track_features(track_doc.get("id", ""))
+        if track_feats is None:
+            track_feats = {"key": "unknown", "key_root": -1, "mode": "unknown", "bpm": 0.0, "contour": "unknown"}
+        input_feats = {"key": "unknown", "key_root": -1, "mode": "unknown", "bpm": 0.0, "contour": "unknown"}
+        scored = features.weighted_match_score(r["score"], input_feats, track_feats)
+
+        candidates.append({
+            "doc": doc,
+            "track_doc": track_doc,
+            "track_feats": track_feats,
+            "scored": scored,
+            "artist_id": r["artist_id"],
+        })
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda c: c["scored"]["raw_score"], reverse=True)
+    pool = candidates[:min(5, len(candidates))]
+    weights = [c["scored"]["score"] for c in pool]
+    best = random.choices(pool, weights=weights, k=1)[0]
+
+    doc = best["doc"]
+    track_doc = best["track_doc"]
+    track_feats = best["track_feats"]
+    scored = best["scored"]
+    artist_id = best["artist_id"]
+    src_url, src_lbl = _source_for(artist_id, doc)
+    input_feats = {"key": "unknown", "key_root": -1, "mode": "unknown", "bpm": 0.0, "contour": "unknown"}
+
+    explanation = _explain_from_text(
+        mode=body.mode,
+        value=body.value,
+        artist_name=doc["name"],
+        artist_born=doc["born"],
+        artist_died=doc["died"],
+        track_title=track_doc["title"],
+        track_year=track_doc["year"],
+        era_context=doc.get("era", ""),
+        track_feats=track_feats,
+    )
+
+    logger.info("CLAP assisted match: %s / %s (score=%.4f).", artist_id, track_doc["id"], scored["score"])
+    return MatchResponse(
+        artist=Artist(
+            id=artist_id,
+            name=doc["name"],
+            born=doc["born"],
+            died=doc["died"],
+            region=doc["region"],
+            bio=doc["bio"],
+            photo_url=doc["photo_url"],
+            era=doc["era"],
+            source_url=src_url,
+            source_label=src_lbl,
+        ),
+        track=Track(
+            id=track_doc["id"],
+            title=track_doc["title"],
+            year=track_doc["year"],
+            audio_url=track_doc["audio_url"],
+            duration_s=track_doc["duration_s"],
+        ),
+        connection=Connection(
+            score=scored["score"],
+            explanation=explanation,
+            shared_features=features.shared_features(input_feats, track_feats),
+            breakdown=MatchBreakdown(**scored["breakdown"]),
+            key_label=track_feats.get("key") if track_feats.get("key") != "unknown" else None,
+            tempo_bpm=track_feats.get("bpm") or None,
+            contour_label=track_feats.get("contour") if track_feats.get("contour") != "unknown" else None,
+            mode_label=_mode_label(track_feats),
+        ),
+    )
+
+
 def _match_assisted_sync(body: AssistedMatchRequest) -> MatchResponse:
     try:
+        clap_result = _clap_assisted_match(body)
+        if clap_result is not None:
+            return clap_result
+
+        logger.info("CLAP unavailable or returned nothing — falling back to GPT feature extraction.")
         text_feats = explain.extract_musical_features(body.mode, body.value)
         if not text_feats:
             text_feats = {"key": "unknown", "key_root": -1, "mode": "unknown", "bpm": 0.0, "contour": "unknown"}
@@ -466,7 +617,7 @@ def _match_assisted_sync(body: AssistedMatchRequest) -> MatchResponse:
         pool = candidates[:min(5, len(candidates))]
         weights = [c["scored"]["score"] for c in pool]
         best = random.choices(pool, weights=weights, k=1)[0]
-        logger.info("Assisted match selected a pool of %d candidates.", len(pool))
+        logger.info("Assisted match (GPT fallback) selected from pool of %d.", len(pool))
 
         artist_id = best["artist_id"]
         doc = best["doc"]
@@ -486,9 +637,8 @@ def _match_assisted_sync(body: AssistedMatchRequest) -> MatchResponse:
             era_context=doc.get("era", ""),
             track_feats=track_feats,
         )
-        logger.info("Assisted match explanation generated for %s / %s.", artist_id, track_doc["id"])
 
-        response = MatchResponse(
+        return MatchResponse(
             artist=Artist(
                 id=artist_id,
                 name=doc["name"],
@@ -519,8 +669,6 @@ def _match_assisted_sync(body: AssistedMatchRequest) -> MatchResponse:
                 mode_label=_mode_label(track_feats),
             ),
         )
-        logger.info("Assisted match response ready for %s.", artist_id)
-        return response
     except Exception as exc:
         logger.error("/api/match/assisted unhandled error: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Assisted match failed.")
